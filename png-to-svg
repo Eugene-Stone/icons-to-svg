@@ -1,0 +1,51 @@
+#!/bin/bash
+cd "$(dirname "$0")"
+mkdir -p svg
+
+for f in source/*.png; do
+	[[ ! -f "$f" || "$f" != *.png ]] && continue
+
+	filename=$(basename "$f")       # arrow.png
+	b="${filename%.*}"              # arrow
+
+	convert "$f" -background white -alpha remove -alpha off -threshold 50% "$b.pnm"
+	potrace -s --tight -O 0.2 "$b.pnm" -o "svg/$b.svg"
+
+	# Удаляем XML-декларацию и DOCTYPE (первые 3 строки)
+	sed -i '' 1,3d "svg/$b.svg"
+
+	# Убираем метаданные potrace
+	sed -i '' '/<metadata/,/<\/metadata>/d' "svg/$b.svg"
+
+	# Удаляем атрибуты width и height из тега <svg>
+	sed -i '' 's/width="[^"]*"//g; s/height="[^"]*"//g' "svg/$b.svg"
+
+	# Удаляем атрибуты preserveAspectRatio <svg>
+	sed -i '' 's/preserveAspectRatio="[^"]*"//g' "svg/$b.svg"
+
+	# Убираем лишние пробелы, которые могли образоваться после удаления атрибутов
+	sed -i '' 's/<svg[^>]*>/<svg>/g' "svg/$b.svg"
+	
+	rm "$b.pnm"
+
+	sed -i '' 's/fill="white"/fill="none"/g; s/<path/<path fill="currentColor"/g' "svg/$b.svg"
+
+	# Удаляем все переводы строк, табы и лишние пробелы
+	perl -i -pe 's/\s+/ /g' "svg/$b.svg"
+
+	# Удаляем пробелы между тегами
+	perl -i -pe 's/>\s+</></g' "svg/$b.svg"
+
+	# Удаляем пробелы в начале и конце
+	perl -i -pe 's/^\s+|\s+$//g' "svg/$b.svg"
+
+	# Удаляем пробелы перед />
+	perl -i -pe 's/\s+\/>/\/>/g' "svg/$b.svg"
+
+done
+
+echo "Готово! Все SVG в папке ./svg"
+
+
+# Закрывает окно Terminal, в котором запущен скрипт
+osascript -e 'tell application "Terminal" to close (first window whose frontmost is true)' -e 'if (count of windows of application "Terminal") is 0 then tell application "Terminal" to quit'
